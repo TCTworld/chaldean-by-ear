@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Add Sets & Terms</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 60px auto; }
+    input, textarea { width: 100%; padding: 8px; margin: 6px 0; font-size: 15px; }
+    button { padding: 10px 20px; margin: 10px 0; cursor: pointer; }
+    .box { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Add Sets & Terms</h1>
+  <p>
+    <a href="/index.html">⬅️ Back to Write Mode</a> |
+    <a href="/manage.html">📋 Manage Terms</a>
+  </p>
+
+  <div class="box">
+    <h3>Create a New Set</h3>
+    <input type="text" id="setName" placeholder="Set name (e.g. Spanish Vocab Week 1)">
+    <button onclick="createSet()">Create Set</button>
+    <p id="setResult"></p>
+  </div>
+
+  <div class="box">
+    <h3>Add a Term</h3>
+    <label>Set ID: <input type="number" id="termSetId" value="1"></label>
+    <input type="text" id="termWord" placeholder="Term (e.g. Hola)">
+    <textarea id="termDef" placeholder="Definition" rows="3"></textarea>
+    <button onclick="addTerm()">Add Term</button>
+    <p id="termResult"></p>
+  </div>
+
+  <script>
+    async function createSet() {
+      const name = document.getElementById('setName').value;
+      if (!name) return alert('Enter a set name');
+      const res = await fetch('/api/sets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      const data = await res.json();
+      document.getElementById('setResult').textContent =
+        `Created "${data.name}" with Set ID: ${data.id}`;
+      document.getElementById('setName').value = '';
+      document.getElementById('termSetId').value = data.id; // auto-fill for convenience
+    }
+
+    async function addTerm() {
+      const set_id = document.getElementById('termSetId').value;
+      const term = document.getElementById('termWord').value;
+      const definition = document.getElementById('termDef').value;
+      if (!term || !definition) return alert('Enter both term and definition');
+
+      const res = await fetch('/api/terms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ set_id, term, definition })
+      });
+      const data = await res.json();
+      document.getElementById('termResult').textContent =
+        `Added "${term}" with Term ID: ${data.id}`;
+      document.getElementById('termWord').value = '';
+      document.getElementById('termDef').value = '';
+    }
+  </script>
+</body>
+</html>

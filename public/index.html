@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Quiz Write Mode</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+  </style>
+</head>
+<body>
+  <h1>Write Mode</h1>
+  <p><a href="/sets.html">📦 Sets Hub</a> | <a href="/record.html">🎙️ Go to Recording Page</a> | <a href="manage.html">📋 Manage Terms </a> | <a href="/add.html">➕ Add Sets/Terms</a></p>
+    
+  </p>
+  <div id="setup">
+    <label>Set of Choice:
+      <select id="setId"></select>
+    </label>
+    <button onclick="loadDue()">Start Session (due only)</button>
+    <button onclick="loadAll()">Practice All Cards (unlimited)</button>
+  </div>
+
+  <div id="quiz" style="display:none;">
+    <button onclick="exitSession()">EXIT Exit Session</button>
+    <button onclick="playAudio()">🔊 Play Term</button>
+    <button onclick="toggleTermText()">👁️ Show Term</button>
+    <p id="termText" style="font-weight:bold; display:none;"></p>
+    <p>Type the definition:</p>
+    <input type="text" id="answer" autocomplete="off">
+    <button onclick="submitAnswer()">Submit</button>
+    <div id="feedback"></div>
+  </div>
+
+  <script>
+    let queue = [];
+    let current = null;
+
+    async function loadDue() {
+      const setId = document.getElementById('setId').value;
+      const res = await fetch(`/api/sets/${setId}/due`);
+      queue = await res.json();
+      document.getElementById('setup').style.display = 'none';
+      document.getElementById('quiz').style.display = 'block';
+      document.getElementById('termText').style.display = 'none';
+      nextTerm();
+    }
+
+   async function loadAll() {
+  const setId = document.getElementById('setId').value;
+  const res = await fetch(`/api/sets/${setId}/all`);
+  queue = await res.json();
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('quiz').style.display = 'block';
+  nextTerm();
+}
+
+    function nextTerm() {
+      if (queue.length === 0) {
+        document.getElementById('quiz').innerHTML = '<h2>Session complete!</h2>';
+        return;
+      }
+      current = queue.shift();
+      document.getElementById('termText').style.display = 'none';
+      document.getElementById('termText').textContent = '';
+      document.getElementById('answer').value = '';
+      document.getElementById('feedback').innerHTML = '';
+      playAudio();
+    }
+
+    function playAudio() {
+      if (current.audio_path) {
+        new Audio(current.audio_path).play();
+      } else {
+        const u = new SpeechSynthesisUtterance(current.term);
+        u.rate = 0.9;
+        speechSynthesis.speak(u);
+      }
+    }
+
+function toggleTermText() {
+  const el = document.getElementById('termText');
+  el.textContent = `Term: ${current.term}`;
+  el.style.display = (el.style.display === 'none') ? 'block' : 'none';
+}
+
+async function loadSetOptions() {
+  const res = await fetch ('/api/sets');
+  const sets = await res.json();
+  const select = document.getElementById('setId');
+  select.innterHTML = '';
+  sets.forEach(s=> {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.name;
+    select.appendChild(opt);
+  });
+}
+
+loadSetOptions();
+
+    async function submitAnswer() {
+      const typed = document.getElementById('answer').value;
+      const res = await fetch(`/api/terms/${current.id}/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ typed, correctDefinition: current.definition })
+      });
+      const result = await res.json();
+      showFeedback(result, typed);
+    }
+
+    function showFeedback(result, typed) {
+      const div = document.getElementById('feedback');
+      div.className = result.correct ? 'correct' : 'incorrect';
+      let html = result.correct
+        ? `<strong>Correct!</strong> Next review in ${result.nextInterval} day(s).`
+        : `<strong>Incorrect.</strong> Correct answer: ${current.definition}`;
+      div.innerHTML = html;
+      setTimeout(nextTerm, 2000);
+    }
+
+    document.getElementById('answer')?.addEventListener('keypress', e => {
+      if (e.key === 'Enter') submitAnswer();
+    });
+  </script>
+</body>
+</html>

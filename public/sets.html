@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Sets Hub</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 60px auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid #ccc; }
+    input { width: 100%; padding: 6px; }
+    button { padding: 6px 12px; cursor: pointer; margin-right: 5px; }
+    a.navlink { margin-right: 5px; }
+  </style>
+</head>
+<body>
+  <h1>Sets Hub</h1>
+  <p>
+    <a href="/index.html">⬅️ Write Mode</a> |
+    <a href="/manage.html">📋 Manage Terms</a> |
+    <a href="/add.html">➕ Add Sets/Terms</a> |
+    <a href="/record.html">🎙️ Recording Page</a>
+  </p>
+
+  <table id="setsTable">
+    <thead>
+      <tr><th>ID</th><th>Name</th><th></th></tr>
+    </thead>
+    <tbody id="setsBody"></tbody>
+  </table>
+
+  <script>
+    async function loadSets() {
+      const res = await fetch('/api/sets');
+      const sets = await res.json();
+      const body = document.getElementById('setsBody');
+      body.innerHTML = '';
+      sets.forEach(s => {
+        const tr = document.createElement('tr');
+        tr.id = `set-row-${s.id}`;
+        tr.innerHTML = `
+          <td>${s.id}</td>
+          <td class="name-cell">${s.name}</td>
+          <td>
+            <button onclick="editSet(${s.id})">✏️ Rename</button>
+            <a class="navlink" href="/manage.html">📋 View Terms</a>
+          </td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    function editSet(id) {
+      const row = document.getElementById(`set-row-${id}`);
+      const nameCell = row.querySelector('.name-cell');
+      const currentName = nameCell.textContent;
+      nameCell.innerHTML = `<input type="text" id="edit-name-${id}" value="${currentName}">`;
+
+      const actionsCell = row.children[2];
+      actionsCell.innerHTML = `
+        <button onclick="saveSet(${id})">💾 Save</button>
+        <button onclick="loadSets()">✖️ Cancel</button>
+      `;
+    }
+
+    async function saveSet(id) {
+      const name = document.getElementById(`edit-name-${id}`).value;
+      await fetch(`/api/sets/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      loadSets();
+    }
+
+    loadSets();
+  </script>
+</body>
+</html>

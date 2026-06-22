@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Manage Terms</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 60px auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ccc; }
+    .has-audio { color: green; }
+    .no-audio { color: #b00; }
+    a.recordlink { text-decoration: underline; color: #0645AD; cursor: pointer; }
+    input { width: 100%; }
+  </style>
+</head>
+<body>
+  <h1>Manage Terms</h1>
+  <p>
+    <a href="/index.html">⬅️ Back to Write Mode</a> |
+    <a href="/record.html">🎙️ Recording Page</a> |
+    <a href="/add.html">➕ Add Sets/Terms</a>
+  </p>
+
+  <label>Set ID: <input type="number" id="setId" value="1" style="width:80px"></label>
+  <button onclick="loadTerms()">Load Terms</button>
+
+  <table id="termsTable">
+    <thead>
+      <tr><th>ID</th><th>Term</th><th>Definition</th><th>Audio</th><th></th></tr>
+    </thead>
+    <tbody id="termsBody"></tbody>
+  </table>
+
+  <script>
+    async function loadTerms() {
+      const setId = document.getElementById('setId').value;
+      const res = await fetch(`/api/sets/${setId}/terms`);
+      const terms = await res.json();
+      const body = document.getElementById('termsBody');
+      body.innerHTML = '';
+      terms.forEach(t => {
+        const tr = document.createElement('tr');
+        tr.id = `row-${t.id}`;
+        tr.innerHTML = `
+          <td>${t.id}</td>
+          <td class="term-cell">${t.term}</td>
+          <td class="def-cell">${t.definition}</td>
+          <td class="${t.audio_path ? 'has-audio' : 'no-audio'}">
+            ${t.audio_path ? '✅' : '❌'}
+          </td>
+          <td>
+            <button onclick="editRow(${t.id})">✏️ Edit</button>
+            <button onclick="deleteRow(${t.id})">🗑️ Delete</button>
+            <a class="recordlink" href="/record.html?termId=${t.id};">🎙️</a>
+            ${t.audio_path ? `<button onclick="removeAudio(${t.id})">🔇 Remove Audio</button>` : ''}
+          </td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    function editRow(id) {
+      const row = document.getElementById(`row-${id}`);
+      const termCell = row.querySelector('.term-cell');
+      const defCell = row.querySelector('.def-cell');
+      const currentTerm = termCell.textContent;
+      const currentDef = defCell.textContent;
+
+      termCell.innerHTML = `<input type="text" id="edit-term-${id}" value="${currentTerm}">`;
+      defCell.innerHTML = `<input type="text" id="edit-def-${id}" value="${currentDef}">`;
+
+      const actionsCell = row.children[4];
+      actionsCell.innerHTML = `
+        <button onclick="saveEdit(${id})">💾 Save</button>
+        <button onclick="loadTerms()">✖️ Cancel</button>
+      `;
+    }
+
+    async function removeAudio(id) {
+      if (!confirm('Remove the recorded audio for this term? It will fall bak to robotic TTS.')) return;
+      await fetch(`/api/terms/${id}/audio`, { method: 'Delete' });
+      loadTerms();
+    }
+
+    async function saveEdit(id) {
+      const term = document.getElementById(`edit-term-${id}`).value;
+      const definition = document.getElementById(`edit-def-${id}`).value;
+      await fetch(`/api/terms/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ term, definition })
+      });
+      loadTerms();
+    }
+
+    async function deleteRow(id) {
+      if (!confirm('Delete this term permanently? This cannot be undone.')) return;
+      await fetch(`/api/terms/${id}`, { method: 'DELETE' });
+      loadTerms();
+    }
+
+    loadTerms();
+  </script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Record Term Audio</title>
+  <style>
+    body { font-family: sans-serif; max-width: 500px; margin: 60px auto; }
+    button { padding: 10px 20px; margin: 5px 0; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Record Audio for a Term</h1>
+  <a href="/index.html">⬅️ Back to Write Mode</a>
+  <label>Term ID: <input type="number" id="termId" oninput=:previewTerm()"></label>
+  <p id="termPreview" stype="font-weight:bold; color:#0645AD;"></p>
+  <br>
+
+  <button id="recordBtn">🎙️ Start Recording</button>
+  <button id="stopBtn" disabled>⏹️ Stop</button>
+  <br><br>
+  <audio id="preview" controls></audio>
+  <br><br>
+  <button id="uploadBtn" disabled>Upload Recording</button>
+
+  <script>
+    let mediaRecorder;
+    let chunks = [];
+
+    document.getElementById('recordBtn').onclick = async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      chunks = [];
+      mediaRecorder.ondataavailable = e => chunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        document.getElementById('preview').src = url;
+        document.getElementById('uploadBtn').disabled = false;
+        window.currentBlob = blob;
+      };
+      mediaRecorder.start();
+      document.getElementById('recordBtn').disabled = true;
+      document.getElementById('stopBtn').disabled = false;
+    };
+
+    document.getElementById('stopBtn').onclick = () => {
+      mediaRecorder.stop();
+      document.getElementById('recordBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+    };
+
+async function previewTerm() {
+  const id = document.getElementById('termId').value;
+  const preview = document.getElementById('termPreview');
+  if (!id) { preview.textContent = ''; return; }
+  const res = await fetch(`/api/terms/${id}`);
+  const data = await res.json();
+  if (data) {
+    preview.textContent = `Recording for: "${data.term}" → ${data.definition}`;
+  } else {
+    preview.textContent = 'No term found with that ID.';
+  }
+}
+
+    document.getElementById('uploadBtn').onclick = async () => {
+      const termId = document.getElementById('termId').value;
+      const formData = new FormData();
+      formData.append('audio', window.currentBlob, 'recording.webm');
+      const res = await fetch(`/api/terms/${termId}/audio`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      alert('Uploaded! Saved at: ' + data.audio_path);
+    };
+  </script>
+</body>
+</html>
+
