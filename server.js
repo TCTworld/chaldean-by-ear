@@ -24,13 +24,23 @@ app.use(express.static('public'));
 
 // Get all sets
 app.get('/api/sets', (req, res) => {
-  db.all('SELECT * FROM sets', (err, rows) => res.json(rows));
+  db.all('SELECT * FROM sets', (err, rows) => {
+    if (err) {
+      console.error('Error fetching sets:', err);
+      return res.status(500).json({ error: 'Failed to fetch sets' });
+    }
+    res.json(rows || []);
+  });
 });
 
 // Create a set
 app.post('/api/sets', (req, res) => {
   const { name } = req.body;
   db.run('INSERT INTO sets (name) VALUES (?)', [name], function (err) {
+    if (err) {
+      console.error('Error creating set:', err);
+      return res.status(500).json({ error: 'Failed to create set' });
+    }
     res.json({ id: this.lastID, name });
   });
 });
@@ -42,6 +52,10 @@ app.post('/api/terms', (req, res) => {
     'INSERT INTO terms (set_id, term, definition, audio_path) VALUES (?, ?, ?, ?)',
     [set_id, term, definition, audio_path || null],
     function (err) {
+      if (err) {
+        console.error('Error creating term:', err);
+        return res.status(500).json({ error: 'Failed to create term' });
+      }
       const termId = this.lastID;
       db.run('INSERT INTO progress (term_id) VALUES (?)', [termId], () => {
         res.json({ id: termId });
@@ -59,7 +73,13 @@ app.get('/api/sets/:setId/due', (req, res) => {
     WHERE t.set_id = ? AND p.next_review_date <= datetime('now')
     ORDER BY p.next_review_date ASC
   `;
-  db.all(query, [req.params.setId], (err, rows) => res.json(rows));
+  db.all(query, [req.params.setId], (err, rows) => {
+    if (err) {
+      console.error('Error fetching due terms:', err);
+      return res.status(500).json({ error: 'Failed to fetch terms' });
+    }
+    res.json(rows || []);
+  });
 });
 
 // Upload a recording for a specific term
@@ -68,7 +88,13 @@ app.post('/api/terms/:termId/audio', upload.single('audio'), (req, res) => {
   db.run(
     'UPDATE terms SET audio_path = ? WHERE id = ?',
     [audioPath, req.params.termId],
-    () => res.json({ audio_path: audioPath })
+    (err) => {
+      if (err) {
+        console.error('Error uploading audio:', err);
+        return res.status(500).json({ error: 'Failed to upload audio' });
+      }
+      res.json({ audio_path: audioPath });
+    }
   );
 });
 
@@ -78,6 +104,10 @@ app.post('/api/terms/:termId/answer', (req, res) => {
   const result = gradeAnswer(typed, correctDefinition);
 
   db.get('SELECT * FROM progress WHERE term_id = ?', [req.params.termId], (err, prog) => {
+    if (err || !prog) {
+      console.error('Error fetching progress:', err);
+      return res.status(500).json({ error: 'Failed to fetch progress' });
+    }
     const { repetitions, easeFactor, interval } = sm2(
       result.quality,
       prog.repetitions,
@@ -89,7 +119,11 @@ app.post('/api/terms/:termId/answer', (req, res) => {
     db.run(
       `UPDATE progress SET repetitions = ?, ease_factor = ?, interval_days = ?, next_review_date = ${nextReview} WHERE term_id = ?`,
       [repetitions, easeFactor, interval, req.params.termId],
-      () => {
+      (err) => {
+        if (err) {
+          console.error('Error updating progress:', err);
+          return res.status(500).json({ error: 'Failed to update progress' });
+        }
         res.json({ ...result, nextInterval: interval });
       }
     );
@@ -103,7 +137,13 @@ app.get('/api/sets/:setId/all', (req, res) => {
       Join progress p ON p.term_id = t.id
       WHERE t.set_id = ?
    `;
-   db.all(query, [req.params.setId], (err, rows) => res.json(rows));
+   db.all(query, [req.params.setId], (err, rows) => {
+     if (err) {
+       console.error('Error fetching all terms:', err);
+       return res.status(500).json({ error: 'Failed to fetch terms' });
+     }
+     res.json(rows || []);
+   });
 });
 
 // Get all terms for a set, with audio status
@@ -111,7 +151,13 @@ app.get('/api/sets/:setId/terms', (req, res) => {
   db.all(
     'SELECT id, term, definition, audio_path FROM terms WHERE set_id = ?',
     [req.params.setId],
-    (err, rows) => res.json(rows)
+    (err, rows) => {
+      if (err) {
+        console.error('Error fetching terms:', err);
+        return res.status(500).json({ error: 'Failed to fetch terms' });
+      }
+      res.json(rows || []);
+    }
   );
 });
 
@@ -121,23 +167,41 @@ app.put('/api/terms/:termId', (req, res) => {
   db.run(
     'UPDATE terms SET term = ?, definition = ? WHERE id = ?',
     [term, definition, req.params.termId],
-    () => res.json({ success: true })
+    (err) => {
+      if (err) {
+        console.error('Error updating term:', err);
+        return res.status(500).json({ error: 'Failed to update term' });
+      }
+      res.json({ success: true });
+    }
   );
 });
 
 // Delete a term (and its progress row)
 app.delete('/api/terms/:termId', (req, res) => {
-  db.run('DELETE FROM progress WHERE term_id = ?', [req.params.termId], () => {
-    db.run('DELETE FROM terms WHERE id = ?', [req.params.termId], () => {
+  db.run('DELETE FROM progress WHERE term_id = ?', [req.params.termId], (err) => {
+    if (err) {
+      console.error('Error deleting progress:', err);
+      return res.status(500).json({ error: 'Failed to delete term' });
+    }
+    db.run('DELETE FROM terms WHERE id = ?', [req.params.termId], (err) => {
+      if (err) {
+        console.error('Error deleting term:', err);
+        return res.status(500).json({ error: 'Failed to delete term' });
+      }
       res.json({ success: true });
     });
   });
 });
 
-// Get a single term's etails
+// Get a single term's details
  app.get('/api/terms/:termId', (req, res) => {
    db.get('SELECT * FROM terms WHERE id = ?', [req.params.termId], (err, row) => {
-      res.json(row);
+     if (err) {
+       console.error('Error fetching term:', err);
+       return res.status(500).json({ error: 'Failed to fetch term' });
+     }
+     res.json(row);
    });
  });
 
@@ -146,7 +210,13 @@ app.delete('/api/terms/:termId', (req, res) => {
    db.run(
      'UPDATE terms SET audio_path = NULL WHERE id = ?',
      [req.params.termId],
-     () => res.json({ success: true })
+     (err) => {
+       if (err) {
+         console.error('Error removing audio:', err);
+         return res.status(500).json({ error: 'Failed to remove audio' });
+       }
+       res.json({ success: true });
+     }
    );
  });
 
@@ -156,9 +226,14 @@ app.delete('/api/terms/:termId', (req, res) => {
    db.run(
      'UPDATE sets SET name = ? WHERE id = ?',
      [name, req.params.setId],
-     () => res.json({ success: true })
+     (err) => {
+       if (err) {
+         console.error('Error renaming set:', err);
+         return res.status(500).json({ error: 'Failed to rename set' });
+       }
+       res.json({ success: true });
+     }
    );
  });
 
 app.listen(3000, () => console.log('Running on http://localhost:3000'));
-
