@@ -33,22 +33,40 @@
     let current = null;
 
     async function loadDue() {
-      const setId = document.getElementById('setId').value;
-      const res = await fetch(`/api/sets/${setId}/due`);
-      queue = await res.json();
-      document.getElementById('setup').style.display = 'none';
-      document.getElementById('quiz').style.display = 'block';
-      document.getElementById('termText').style.display = 'none';
-      nextTerm();
+      try {
+        const setId = document.getElementById('setId').value;
+        if (!setId) {
+          alert('Please select a set first');
+          return;
+        }
+        const res = await fetch(`/api/sets/${setId}/due`);
+        queue = await res.json();
+        document.getElementById('setup').style.display = 'none';
+        document.getElementById('quiz').style.display = 'block';
+        document.getElementById('termText').style.display = 'none';
+        nextTerm();
+      } catch (e) {
+        console.error('Error in loadDue:', e);
+        alert('Error loading terms: ' + e.message);
+      }
     }
 
     async function loadAll() {
-      const setId = document.getElementById('setId').value;
-      const res = await fetch(`/api/sets/${setId}/all`);
-      queue = await res.json();
-      document.getElementById('setup').style.display = 'none';
-      document.getElementById('quiz').style.display = 'block';
-      nextTerm();
+      try {
+        const setId = document.getElementById('setId').value;
+        if (!setId) {
+          alert('Please select a set first');
+          return;
+        }
+        const res = await fetch(`/api/sets/${setId}/all`);
+        queue = await res.json();
+        document.getElementById('setup').style.display = 'none';
+        document.getElementById('quiz').style.display = 'block';
+        nextTerm();
+      } catch (e) {
+        console.error('Error in loadAll:', e);
+        alert('Error loading terms: ' + e.message);
+      }
     }
 
     function nextTerm() {
@@ -65,9 +83,9 @@
     }
 
     function playAudio() {
-      if (current.audio_path) {
+      if (current && current.audio_path) {
         new Audio(current.audio_path).play();
-      } else {
+      } else if (current) {
         const u = new SpeechSynthesisUtterance(current.term);
         u.rate = 0.9;
         speechSynthesis.speak(u);
@@ -76,21 +94,43 @@
 
     function toggleTermText() {
       const el = document.getElementById('termText');
-      el.textContent = `Term: ${current.term}`;
-      el.style.display = (el.style.display === 'none') ? 'block' : 'none';
+      if (current) {
+        el.textContent = `Term: ${current.term}`;
+        el.style.display = (el.style.display === 'none') ? 'block' : 'none';
+      }
     }
 
     async function loadSetOptions() {
-      const res = await fetch('/api/sets');
-      const sets = await res.json();
-      const select = document.getElementById('setId');
-      select.innerHTML = '';
-      sets.forEach(s => {
-        const opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = s.name;
-        select.appendChild(opt);
-      });
+      try {
+        console.log('Loading set options...');
+        const res = await fetch('/api/sets');
+        console.log('Response status:', res.status);
+        const sets = await res.json();
+        console.log('Sets received:', sets);
+        const select = document.getElementById('setId');
+        select.innerHTML = '';
+        if (!Array.isArray(sets)) {
+          console.error('Sets is not an array:', sets);
+          return;
+        }
+        if (sets.length === 0) {
+          console.warn('No sets returned from API');
+          const opt = document.createElement('option');
+          opt.textContent = 'No sets available';
+          select.appendChild(opt);
+          return;
+        }
+        sets.forEach(s => {
+          console.log('Adding set:', s.id, s.name);
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.name;
+          select.appendChild(opt);
+        });
+        console.log('Set options loaded successfully');
+      } catch (e) {
+        console.error('Error loading set options:', e);
+      }
     }
 
     function exitSession() {
@@ -100,17 +140,24 @@
       current = null;
     }
 
+    // Load sets when page loads
+    window.addEventListener('DOMContentLoaded', loadSetOptions);
     loadSetOptions();
 
     async function submitAnswer() {
-      const typed = document.getElementById('answer').value;
-      const res = await fetch(`/api/terms/${current.id}/answer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ typed, correctDefinition: current.definition })
-      });
-      const result = await res.json();
-      showFeedback(result, typed);
+      try {
+        const typed = document.getElementById('answer').value;
+        const res = await fetch(`/api/terms/${current.id}/answer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ typed, correctDefinition: current.definition })
+        });
+        const result = await res.json();
+        showFeedback(result, typed);
+      } catch (e) {
+        console.error('Error submitting answer:', e);
+        alert('Error submitting answer: ' + e.message);
+      }
     }
 
     function showFeedback(result, typed) {
