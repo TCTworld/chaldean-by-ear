@@ -5,13 +5,10 @@
   <title>Quiz Write Mode</title>
   <link rel="stylesheet" href="/style.css">
 </head>
-  </style>
-</head>
 <body>
   <h1>Write Mode</h1>
-  <p><a href="/sets.html">📦 Sets Hub</a> | <a href="/record.html">🎙️ Go to Recording Page</a> | <a href="manage.html">📋 Manage Terms </a> | <a href="/add.html">➕ Add Sets/Terms</a></p[...]
+  <p><a href="/sets.html">📦 Sets Hub</a> | <a href="/record.html">🎙️ Go to Recording Page</a> | <a href="manage.html">📋 Manage Terms</a> | <a href="/add.html">➕ Add Sets/Terms</a></p>
     
-  </p>
   <div id="setup">
     <label>Set of Choice:
       <select id="setId"></select>
@@ -45,14 +42,14 @@
       nextTerm();
     }
 
-   async function loadAll() {
-  const setId = document.getElementById('setId').value;
-  const res = await fetch(`/api/sets/${setId}/all`);
-  queue = await res.json();
-  document.getElementById('setup').style.display = 'none';
-  document.getElementById('quiz').style.display = 'block';
-  nextTerm();
-}
+    async function loadAll() {
+      const setId = document.getElementById('setId').value;
+      const res = await fetch(`/api/sets/${setId}/all`);
+      queue = await res.json();
+      document.getElementById('setup').style.display = 'none';
+      document.getElementById('quiz').style.display = 'block';
+      nextTerm();
+    }
 
     function nextTerm() {
       if (queue.length === 0) {
@@ -77,26 +74,33 @@
       }
     }
 
-function toggleTermText() {
-  const el = document.getElementById('termText');
-  el.textContent = `Term: ${current.term}`;
-  el.style.display = (el.style.display === 'none') ? 'block' : 'none';
-}
+    function toggleTermText() {
+      const el = document.getElementById('termText');
+      el.textContent = `Term: ${current.term}`;
+      el.style.display = (el.style.display === 'none') ? 'block' : 'none';
+    }
 
-async function loadSetOptions() {
-  const res = await fetch ('/api/sets');
-  const sets = await res.json();
-  const select = document.getElementById('setId');
-  select.innerHTML = '';
-  sets.forEach(s=> {
-    const opt = document.createElement('option');
-    opt.value = s.id;
-    opt.textContent = s.name;
-    select.appendChild(opt);
-  });
-}
+    async function loadSetOptions() {
+      const res = await fetch('/api/sets');
+      const sets = await res.json();
+      const select = document.getElementById('setId');
+      select.innerHTML = '';
+      sets.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.name;
+        select.appendChild(opt);
+      });
+    }
 
-loadSetOptions();
+    function exitSession() {
+      document.getElementById('setup').style.display = 'block';
+      document.getElementById('quiz').style.display = 'none';
+      queue = [];
+      current = null;
+    }
+
+    loadSetOptions();
 
     async function submitAnswer() {
       const typed = document.getElementById('answer').value;
