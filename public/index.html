@@ -9,7 +9,7 @@
 </head>
 <body>
   <h1>Write Mode</h1>
-  <p><a href="/sets.html">📦 Sets Hub</a> | <a href="/record.html">🎙️ Go to Recording Page</a> | <a href="manage.html">📋 Manage Terms </a> | <a href="/add.html">➕ Add Sets/Terms</a></p>
+  <p><a href="/sets.html">📦 Sets Hub</a> | <a href="/record.html">🎙️ Go to Recording Page</a> | <a href="manage.html">📋 Manage Terms </a> | <a href="/add.html">➕ Add Sets/Terms</a></p[...]
     
   </p>
   <div id="setup">
@@ -87,7 +87,7 @@ async function loadSetOptions() {
   const res = await fetch ('/api/sets');
   const sets = await res.json();
   const select = document.getElementById('setId');
-  select.innterHTML = '';
+  select.innerHTML = '';
   sets.forEach(s=> {
     const opt = document.createElement('option');
     opt.value = s.id;
