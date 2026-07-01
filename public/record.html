@@ -1,78 +1,241 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta charset="UTF-8">
-  <title>Record Term Audio</title>
+  <title>Record Audio | Chaldean by Ear</title>
+  <link rel="stylesheet" href="/style.css">
+
   <style>
-    body { font-family: sans-serif; max-width: 500px; margin: 60px auto; }
-    button { padding: 10px 20px; margin: 5px 0; cursor: pointer; }
+    body {
+      font-family: sans-serif;
+      max-width: 650px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+
+    button, select, input {
+      padding: 10px;
+      margin: 6px 0;
+    }
+
+    #dropZone {
+      border: 2px dashed #666;
+      border-radius: 10px;
+      padding: 30px;
+      text-align: center;
+      margin: 20px 0;
+      cursor: pointer;
+    }
+
+    #dropZone.dragging {
+      border-color: #0645AD;
+      background: #eef5ff;
+    }
+
+    #status {
+      font-weight: bold;
+    }
   </style>
 </head>
+
 <body>
-  <h1>Record Audio for a Term</h1>
-  <a href="/index.html">⬅️ Back to Write Mode</a>
-  <label>Term ID: <input type="number" id="termId" oninput=:previewTerm()"></label>
-  <p id="termPreview" stype="font-weight:bold; color:#0645AD;"></p>
+  <h1>🎙️ Add Audio</h1>
+
+  <p><a href="/manage.html">← Back to Manage Terms</a></p>
+
+  <label>
+    Term ID:
+    <input type="number" id="termId" min="1">
+  </label>
+
   <br>
+
+  <label>
+    Audio for:
+    <select id="audioType">
+      <option value="term">Term pronunciation (Chaldean)</option>
+      <option value="definition">Definition pronunciation (English)</option>
+    </select>
+  </label>
+
+  <p id="termPreview"></p>
+
+  <hr>
+
+  <h3>Record with microphone</h3>
 
   <button id="recordBtn">🎙️ Start Recording</button>
   <button id="stopBtn" disabled>⏹️ Stop</button>
+
   <br><br>
+
+  <h3>Or upload an MP3 / audio file</h3>
+
+  <div id="dropZone">
+    Drag and drop an MP3 here<br>
+    or click to choose a file
+  </div>
+
+  <input
+    type="file"
+    id="audioFile"
+    accept="audio/mpeg,audio/mp3,audio/webm,audio/wav,audio/ogg"
+    hidden
+  >
+
   <audio id="preview" controls></audio>
+
   <br><br>
-  <button id="uploadBtn" disabled>Upload Recording</button>
+
+  <button id="uploadBtn" disabled>Upload Audio</button>
+  <p id="status"></p>
 
   <script>
     let mediaRecorder;
     let chunks = [];
+    let selectedAudio = null;
 
-    document.getElementById('recordBtn').onclick = async () => {
+    const termIdInput = document.getElementById("termId");
+    const audioTypeInput = document.getElementById("audioType");
+    const preview = document.getElementById("preview");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const status = document.getElementById("status");
+    const fileInput = document.getElementById("audioFile");
+    const dropZone = document.getElementById("dropZone");
+
+    async function previewTerm() {
+      const id = termIdInput.value;
+      const previewText = document.getElementById("termPreview");
+
+      if (!id) {
+        previewText.textContent = "";
+        return;
+      }
+
+      const res = await fetch(`/api/terms/${id}`);
+      const data = await res.json();
+
+      if (!data) {
+        previewText.textContent = "No term found with that ID.";
+        return;
+      }
+
+      const target = audioTypeInput.value === "term"
+        ? `TERM: "${data.term}"`
+        : `DEFINITION: "${data.definition}"`;
+
+      previewText.textContent = `You are adding audio for ${target}`;
+    }
+
+    function useSelectedAudio(file) {
+      if (!file) return;
+
+      if (!file.type.startsWith("audio/")) {
+        alert("Please choose an audio file such as MP3, WebM, WAV, or OGG.");
+        return;
+      }
+
+      selectedAudio = file;
+      preview.src = URL.createObjectURL(file);
+      uploadBtn.disabled = false;
+      status.textContent = `Ready: ${file.name}`;
+    }
+
+    termIdInput.addEventListener("input", previewTerm);
+    audioTypeInput.addEventListener("change", previewTerm);
+
+    document.getElementById("recordBtn").onclick = async () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
       mediaRecorder = new MediaRecorder(stream);
       chunks = [];
-      mediaRecorder.ondataavailable = e => chunks.push(e.data);
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        const url = URL.createObjectURL(blob);
-        document.getElementById('preview').src = url;
-        document.getElementById('uploadBtn').disabled = false;
-        window.currentBlob = blob;
+
+      mediaRecorder.ondataavailable = event => {
+        chunks.push(event.data);
       };
+
+      mediaRecorder.onstop = () => {
+        selectedAudio = new Blob(chunks, { type: "audio/webm" });
+        preview.src = URL.createObjectURL(selectedAudio);
+        uploadBtn.disabled = false;
+        status.textContent = "Recording ready to upload.";
+
+        stream.getTracks().forEach(track => track.stop());
+      };
+
       mediaRecorder.start();
-      document.getElementById('recordBtn').disabled = true;
-      document.getElementById('stopBtn').disabled = false;
+      document.getElementById("recordBtn").disabled = true;
+      document.getElementById("stopBtn").disabled = false;
+      status.textContent = "Recording...";
     };
 
-    document.getElementById('stopBtn').onclick = () => {
+    document.getElementById("stopBtn").onclick = () => {
       mediaRecorder.stop();
-      document.getElementById('recordBtn').disabled = false;
-      document.getElementById('stopBtn').disabled = true;
+      document.getElementById("recordBtn").disabled = false;
+      document.getElementById("stopBtn").disabled = true;
     };
 
-async function previewTerm() {
-  const id = document.getElementById('termId').value;
-  const preview = document.getElementById('termPreview');
-  if (!id) { preview.textContent = ''; return; }
-  const res = await fetch(`/api/terms/${id}`);
-  const data = await res.json();
-  if (data) {
-    preview.textContent = `Recording for: "${data.term}" → ${data.definition}`;
-  } else {
-    preview.textContent = 'No term found with that ID.';
-  }
-}
+    dropZone.onclick = () => fileInput.click();
 
-    document.getElementById('uploadBtn').onclick = async () => {
-      const termId = document.getElementById('termId').value;
+    fileInput.onchange = () => {
+      useSelectedAudio(fileInput.files[0]);
+    };
+
+    dropZone.addEventListener("dragover", event => {
+      event.preventDefault();
+      dropZone.classList.add("dragging");
+    });
+
+    dropZone.addEventListener("dragleave", () => {
+      dropZone.classList.remove("dragging");
+    });
+
+    dropZone.addEventListener("drop", event => {
+      event.preventDefault();
+      dropZone.classList.remove("dragging");
+      useSelectedAudio(event.dataTransfer.files[0]);
+    });
+
+    uploadBtn.onclick = async () => {
+      const termId = termIdInput.value;
+
+      if (!termId) {
+        alert("Enter a Term ID first.");
+        return;
+      }
+
+      if (!selectedAudio) {
+        alert("Record or choose an audio file first.");
+        return;
+      }
+
       const formData = new FormData();
-      formData.append('audio', window.currentBlob, 'recording.webm');
+      formData.append("audio", selectedAudio, selectedAudio.name || "recording.webm");
+      formData.append("audioType", audioTypeInput.value);
+
       const res = await fetch(`/api/terms/${termId}/audio`, {
-        method: 'POST',
+        method: "POST",
         body: formData
       });
+
       const data = await res.json();
-      alert('Uploaded! Saved at: ' + data.audio_path);
+
+      if (!res.ok) {
+        status.textContent = data.error || "Upload failed.";
+        return;
+      }
+
+      status.textContent = `Saved ${data.audioType} audio successfully.`;
     };
+
+    const params = new URLSearchParams(window.location.search);
+    const termIdFromUrl = params.get("termId");
+
+    if (termIdFromUrl) {
+      termIdInput.value = termIdFromUrl;
+      previewTerm();
+    }
   </script>
 </body>
 </html>

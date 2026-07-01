@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <title>Settings | Chaldean by Ear</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="container">
+    <h1>⚙️ Settings</h1>
+    
+    <label>
+  Study direction
+  <select id="studyDirection">
+    <option value="termToDefinition">
+      Hear Chaldean term → type English definition
+    </option>
+    <option value="definitionToTerm">
+      Hear English definition → type Chaldean term
+    </option>
+  </select>
+</label>
+
+<br><br>
+
+    <label>
+      Card order
+      <select id="studyOrder">
+        <option value="random">Random</option>
+        <option value="id">Term ID order</option>
+        <option value="alphabetical">Alphabetical order</option>
+      </select>
+    </label>
+
+    <br><br>
+
+    <label>
+      <input type="checkbox" id="autoPlay" checked>
+      Automatically play audio for each card
+    </label>
+
+    <br><br>
+
+    <label>
+      AI voice speed
+      <select id="speechRate">
+        <option value="0.7">Slow</option>
+        <option value="0.9">Normal</option>
+        <option value="1">Fast</option>
+      </select>
+    </label>
+
+    <br><br>
+
+    <label>
+      <input type="checkbox" id="showAfterWrong" checked>
+      Show the term after an incorrect answer
+    </label>
+
+    <br><br>
+
+    <label>
+      Seconds before next card
+      <select id="nextDelay">
+        <option value="1000">1 second</option>
+        <option value="2000">2 seconds</option>
+        <option value="3000">3 seconds</option>
+        <option value="5000">5 seconds</option>
+      </select>
+    </label>
+
+    <br><br>
+
+    <button id="saveBtn">Save Settings</button>
+    <p id="message"></p>
+
+    <p><a href="/index.html">← Back to Study</a></p>
+  </main>
+
+  <script>
+  const defaults = {
+    studyOrder: "random",
+    studyDirection: "termToDefinition",
+    autoPlay: true,
+    speechRate: "0.9",
+    showAfterWrong: true,
+    nextDelay: "2000"
+  };
+
+  const saved = {
+    ...defaults,
+    ...JSON.parse(localStorage.getItem("chaldeanSettings") || "{}")
+  };
+
+  document.getElementById("studyOrder").value = saved.studyOrder;
+  document.getElementById("studyDirection").value = saved.studyDirection;
+  document.getElementById("autoPlay").checked = saved.autoPlay;
+  document.getElementById("speechRate").value = saved.speechRate;
+  document.getElementById("showAfterWrong").checked = saved.showAfterWrong;
+  document.getElementById("nextDelay").value = saved.nextDelay;
+
+  document.getElementById("saveBtn").onclick = () => {
+    const settings = {
+      studyOrder: document.getElementById("studyOrder").value,
+      studyDirection: document.getElementById("studyDirection").value,
+      autoPlay: document.getElementById("autoPlay").checked,
+      speechRate: document.getElementById("speechRate").value,
+      showAfterWrong: document.getElementById("showAfterWrong").checked,
+      nextDelay: document.getElementById("nextDelay").value
+    };
+
+    localStorage.setItem("chaldeanSettings", JSON.stringify(settings));
+    document.getElementById("message").textContent =
+      `Saved: ${settings.studyDirection}`;
+  };
+</script>
+</body>
+</html>

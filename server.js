@@ -11,11 +11,15 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'public/audio'),
   filename: (req, file, cb) => {
     const termId = req.params.termId;
-    const ext = path.extname(file.originalname);
-    cb(null, `term-${termId}${ext}`);
+    const audioType = req.body.audioType === 'definition'
+      ? 'definition'
+      : 'term';
+
+    const ext = path.extname(file.originalname) || '.webm';
+
+    cb(null, `${audioType}-${termId}${ext}`);
   }
 });
-
 const upload = multer({ storage });
 const app = express();
 app.use(cors());
@@ -64,11 +68,34 @@ app.get('/api/sets/:setId/due', (req, res) => {
 
 // Upload a recording for a specific term
 app.post('/api/terms/:termId/audio', upload.single('audio'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No audio file received.' });
+  }
+
+  const audioType = req.body.audioType === 'definition'
+    ? 'definition'
+    : 'term';
+
   const audioPath = `/audio/${req.file.filename}`;
+
+  const column = audioType === 'definition'
+    ? 'definition_audio_path'
+    : 'audio_path';
+
   db.run(
-    'UPDATE terms SET audio_path = ? WHERE id = ?',
+    `UPDATE terms SET ${column} = ? WHERE id = ?`,
     [audioPath, req.params.termId],
-    () => res.json({ audio_path: audioPath })
+    function (err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Term ID not found.' });
+      }
+
+      res.json({ audio_path: audioPath, audioType });
+    }
   );
 });
 
@@ -127,11 +154,37 @@ app.put('/api/terms/:termId', (req, res) => {
 
 // Delete a term (and its progress row)
 app.delete('/api/terms/:termId', (req, res) => {
-  db.run('DELETE FROM progress WHERE term_id = ?', [req.params.termId], () => {
-    db.run('DELETE FROM terms WHERE id = ?', [req.params.termId], () => {
-      res.json({ success: true });
-    });
-  });
+  db.run('DELETE FROM progress WHERE term_id = ?', [req.params.termId], (err)=> {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to delete progress' });
+    }
+
+    db.run('DELETE FROM terms WHERE id = ?', [req.params.termId], (err)=> {
+      if (err) {
+        return res.status(500).json({ error: ' Failed to delete term' });
+    }
+
+        // Check whether every term has now been deleted
+      db.get('SELECT COUNT(*) AS count FROM terms', (err, row) => {
+        if (err) {
+          return res.status(500).json({ error: 'Failed to check terms' });
+        }
+
+        // Reset term IDs only when there are zero terms left
+        if (row.count === 0) {
+          db.run("DELETE FROM sqlite_sequence WHERE name = 'terms'", (err) => {
+            if (err) {
+              return res.status(500).json({ error: 'Failed to reset term IDs' });
+            }
+
+            res.json({ success: true, resetIds: true });
+          });
+        } else {
+          res.json({ success: true, resetIds: false });
+        }
+      });
+    });
+  });
 });
 
 // Get a single term's etails
@@ -160,5 +213,8 @@ app.delete('/api/terms/:termId', (req, res) => {
    );
  });
 
-app.listen(3000, () => console.log('Running on http://localhost:3000'));
+const PORT = process.env.PORT || 3000;
 
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});

@@ -1,57 +1,167 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta charset="UTF-8">
-  <title>Quiz Write Mode</title>
+  <title>Chaldean by ear</title>
   <link rel="stylesheet" href="/style.css">
 </head>
-  </style>
-</head>
 <body>
-  <h1>Write Mode</h1>
-  <p><a href="/sets.html">📦 Sets Hub</a> | <a href="/record.html">🎙️ Go to Recording Page</a> | <a href="manage.html">📋 Manage Terms </a> | <a href="/add.html">➕ Add Sets/Terms</a></p>
-    
-  </p>
-  <div id="setup">
-    <label>Set of Choice:
-      <select id="setId"></select>
-    </label>
-    <button onclick="loadDue()">Start Session (due only)</button>
-    <button onclick="loadAll()">Practice All Cards (unlimited)</button>
+  <div class="page-wrap">
+    <div class="main-content">
+
+      <div class="site-header">
+        <div class="logo-row">
+          <img src="/images/logo.png" alt="Chaldean by ear logo" class="logo-img">
+          <p class="logo">Chaldean <span>by Ear</span></p>
+        </div>
+        <p class="tagline">A chance to preserve OUR language</p>
+      </div>
+
+      <nav class="top">
+        <a href="/sets.html">📦 Sets Hub</a>
+        <a href="/record.html">🎙 Go to Recording Page</a>
+        <a href="/manage.html">📋 Manage Terms</a>
+        <a href="/add.html">➕ Add Sets/Terms</a>
+      </nav>
+
+      <div id="setup">
+        <label>Set of Choice:
+          <select id="setID">
+            <option value="">Loading sets...</option> 
+          </select>
+        </label>
+        <button onclick="loadDue()">Start Session (due only)</button>
+        <button onclick="loadAll()">Practice All Cards (unlimited)</button>
+      </div>
+
+      <div id="quiz" style="display:none;">
+        <button onclick="exitSession()">🚪 Exit Session</button>
+        <button onclick="playAudio()">🔊 Play Term</button>
+        <button onclick="toggleTermText()">👁 Reveal Text</button>
+        <p id="termText" style="font-weight:bold; display:none;"></p>
+        <p id="answerPrompt">Type your answer:</p>
+        <input type="text" id="answer" autocomplete="off">
+        <button id="submitBtn" onclick="submitAnswer()">Submit</button>
+        <div id="feedback"></div>
+      </div>
+
+    </div>
+
+    <div class="toc">
+      <h3>Sections</h3>
+      <ul>
+        <li><a href="/index.html">Study</a></li>
+        <li><a href="/settings.html"> Settings</a></li>
+        <li><a href="/about.html">About</a></li>
+        <li><a href="/other-sites.html">Other Sites</a></li>
+      </ul>
+    </div>
   </div>
 
-  <div id="quiz" style="display:none;">
-    <button onclick="exitSession()">EXIT Exit Session</button>
-    <button onclick="playAudio()">🔊 Play Term</button>
-    <button onclick="toggleTermText()">👁️ Show Term</button>
-    <p id="termText" style="font-weight:bold; display:none;"></p>
-    <p>Type the definition:</p>
-    <input type="text" id="answer" autocomplete="off">
-    <button onclick="submitAnswer()">Submit</button>
-    <div id="feedback"></div>
-  </div>
+<section class="book-section">
+ <img src="/chaldeanbook.jpeg" alt="Book cover" class="book-image">  
 
-  <script>
+ <div class="book-text">
+   <h2>
+      Main Source of Information:
+   </h2>
+   <h3>
+      Introductory Chaldean by Bp. Sarhad Y. Jammo and Fr. Andrew Younan
+   </h3>
+   <p>
+     This book is an introduction to the Chaldean-Aramaic language, with exercises in alphabet and vowels, basic conversation, common phrases, introductory vocabulary, reading exercises, literature samples, and a 2000 word glossary.
+     The accuracy of the book's translation of Chaldean-Aramaric to English is validated by my parents, who are fluent speakers of the niche language portrayed book and confirmed that the translations and pronounciations are accurate.
+     This is one of the very few tools out there to truly learn the language, as there is not much educational documentation related to the obscurity of the Chaldean language.
+   </p>
+ </div>
+</section>
+
+ 
+ <script>
     let queue = [];
     let current = null;
+    let answerLocked = false;
+function getSettings() {
+  return {
+    studyOrder: "random",
+    studyDirection: "termToDefinition",
+    autoPlay: true,
+    speechRate: "0.9",
+    showAfterWrong: true,
+    nextDelay: "2000",
+    ...JSON.parse(localStorage.getItem("chaldeanSettings") || "{}")
+  };
+}
+
+function arrangeQueue(cards) {
+  const settings = getSettings();
+
+  if (settings.studyOrder === "id") {
+    return cards.sort((a, b) => a.id - b.id);
+  }
+
+  if (settings.studyOrder === "alphabetical") {
+    return cards.sort((a, b) =>
+      a.term.localeCompare(b.term, undefined, { sensitivity: "base" })
+    );
+  }
+
+  return cards.sort(() => Math.random() - 0.5);
+}
 
     async function loadDue() {
-      const setId = document.getElementById('setId').value;
-      const res = await fetch(`/api/sets/${setId}/due`);
-      queue = await res.json();
-      document.getElementById('setup').style.display = 'none';
-      document.getElementById('quiz').style.display = 'block';
-      document.getElementById('termText').style.display = 'none';
-      nextTerm();
-    }
+  const setId = document.getElementById('setID').value;
 
-   async function loadAll() {
-  const setId = document.getElementById('setId').value;
-  const res = await fetch(`/api/sets/${setId}/all`);
-  queue = await res.json();
+  if (!setId) {
+    alert("Choose a study set first.");
+    return;
+  }
+
+  const res = await fetch(`/api/sets/${setId}/due`);
+  queue = arrangeQueue(await res.json());
+
+  if (queue.length === 0) {
+    alert("No cards are due in this set.");
+    return;
+  }
+
   document.getElementById('setup').style.display = 'none';
   document.getElementById('quiz').style.display = 'block';
+
   nextTerm();
+}
+
+async function loadAll() {
+  const setId = document.getElementById('setID').value;
+
+  if (!setId) {
+    alert("Choose a study set first.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/sets/${setId}/all`);
+
+    if (!res.ok) {
+      throw new Error("Could not load cards");
+    }
+
+    queue = arrangeQueue(await res.json());
+
+    if (queue.length === 0) {
+      alert("No cards found in this study set.");
+      return;
+    }
+
+    document.getElementById('setup').style.display = 'none';
+    document.getElementById('quiz').style.display = 'block';
+
+    nextTerm();
+  } catch (error) {
+    console.error(error);
+    alert("There was a problem loading the cards.");
+  }
 }
 
     function nextTerm() {
@@ -59,69 +169,148 @@
         document.getElementById('quiz').innerHTML = '<h2>Session complete!</h2>';
         return;
       }
+
       current = queue.shift();
+
       document.getElementById('termText').style.display = 'none';
-      document.getElementById('termText').textContent = '';
-      document.getElementById('answer').value = '';
-      document.getElementById('feedback').innerHTML = '';
+      document.getElementById('termText').textContent = "";
+      document.getElementById('answer').value = "";
+      document.getElementById('feedback').innerHTML = "";
+      document.getElementById("feedback").className = "";
+
+      answerLocked = false;
+    document.getElementById("submitBtn").disabled = false;
+
+      const settings = getSettings();
+
+document.getElementById("answerPrompt").textContent =
+  settings.studyDirection === "definitionToTerm"
+    ? "Type the Chaldean term:"
+    : "Type the English definition:";
+ 
       playAudio();
     }
 
     function playAudio() {
-      if (current.audio_path) {
-        new Audio(current.audio_path).play();
-      } else {
-        const u = new SpeechSynthesisUtterance(current.term);
-        u.rate = 0.9;
-        speechSynthesis.speak(u);
-      }
-    }
+  const settings = getSettings();
 
-function toggleTermText() {
-  const el = document.getElementById('termText');
-  el.textContent = `Term: ${current.term}`;
-  el.style.display = (el.style.display === 'none') ? 'block' : 'none';
+  if (!settings.autoPlay) return;
+
+  const isReverse = settings.studyDirection === "definitionToTerm";
+
+  const textToSpeak = isReverse
+    ? current.definition
+    : current.term;
+
+  const savedAudio = isReverse
+    ? current.definition_audio_path
+    : current.audio_path;
+
+  if (savedAudio) {
+    new Audio(savedAudio).play();
+  } else {
+    const u = new SpeechSynthesisUtterance(textToSpeak);
+    u.rate = Number(settings.speechRate);
+    speechSynthesis.speak(u);
+  }
+}
+
+    function toggleTermText() {
+  const el = document.getElementById("termText");
+  const settings = getSettings();
+
+  const isReverse = settings.studyDirection === "definitionToTerm";
+
+  const promptText = isReverse
+    ? `Definition: ${current.definition}`
+    : `Term: ${current.term}`;
+
+  el.textContent = promptText;
+  el.style.display = (el.style.display === "none") ? "block" : "none";
 }
 
 async function loadSetOptions() {
-  const res = await fetch ('/api/sets');
-  const sets = await res.json();
-  const select = document.getElementById('setId');
-  select.innterHTML = '';
-  sets.forEach(s=> {
-    const opt = document.createElement('option');
-    opt.value = s.id;
-    opt.textContent = s.name;
-    select.appendChild(opt);
-  });
+  const setDropdown = document.getElementById("setID");
+
+  try {
+    const response = await fetch("/api/sets");
+    const sets = await response.json();
+
+    setDropdown.innerHTML = '<option value="">Choose a set</option>';
+
+    for (const set of sets) {
+      const option = document.createElement("option");
+      option.value = set.id;
+      option.textContent = set.name;
+      setDropdown.appendChild(option);
+    }
+  } catch (error) {
+    console.error(error);
+    setDropdown.innerHTML =
+      '<option value="">Could not load sets</option>';
+  }
 }
 
-loadSetOptions();
+window.addEventListener("DOMContentLoaded", loadSetOptions);
 
     async function submitAnswer() {
-      const typed = document.getElementById('answer').value;
-      const res = await fetch(`/api/terms/${current.id}/answer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ typed, correctDefinition: current.definition })
-      });
-      const result = await res.json();
-      showFeedback(result, typed);
-    }
+  if (answerLocked) return;
+
+  answerLocked = true;
+  document.getElementById("submitBtn").disabled = true;
+
+  const typed = document.getElementById("answer").value;
+  const settings = getSettings();
+
+  const correctAnswer =
+    settings.studyDirection === "definitionToTerm"
+      ? current.term
+      : current.definition;
+
+  const res = await fetch(`/api/terms/${current.id}/answer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      typed,
+      correctDefinition: correctAnswer
+    })
+  });
+
+  const result = await res.json();
+  showFeedback(result, typed);
+}
 
     function showFeedback(result, typed) {
       const div = document.getElementById('feedback');
       div.className = result.correct ? 'correct' : 'incorrect';
       let html = result.correct
         ? `<strong>Correct!</strong> Next review in ${result.nextInterval} day(s).`
-        : `<strong>Incorrect.</strong> Correct answer: ${current.definition}`;
+        : `<strong>Incorrect.</strong> Correct answer: ${
+            getSettings().studyDirection === "definitionToTerm"
+              ? current.term
+              : current.definition
+          }`;
+
       div.innerHTML = html;
-      setTimeout(nextTerm, 2000);
+      const settings = getSettings();
+
+if (!result.correct && settings.showAfterWrong) {
+  const revealText =
+    settings.studyDirection === "definitionToTerm"
+      ? `Term: ${current.term}`
+      : `Definition: ${current.definition}`;
+
+  document.getElementById("termText").textContent = revealText;
+  document.getElementById("termText").style.display = "block";
+}
+
+setTimeout(nextTerm, Number(settings.nextDelay));
     }
 
-    document.getElementById('answer')?.addEventListener('keypress', e => {
-      if (e.key === 'Enter') submitAnswer();
-    });
-  </script>
-</body>
-</html>
+    function exitSession() {
+      queue = [];
+      current = null;
+      document.getElementById('quiz').style.display = 'none';
+      document.getElementById('setup').style.display = 'block';
+    }
+</script>
